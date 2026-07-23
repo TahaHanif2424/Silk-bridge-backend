@@ -46,3 +46,21 @@ model Application {
   tierId       String   @default("silver")
   submitted    DateTime @default(now())
 }
+
+model Tier {
+  id          String   @id // e.g. "silver", "gold"
+  name        String
+  discountPct Int
+  color       String
+}
+
+model Booking {
+  id           String   @id @default(uuid())
+  packageTitle String
+  clientName   String
+  status       String   @default("pending") // confirmed, hold, cancelled
+  amount       Float
+  date         String   // Using String for simple YYYY-MM-DD
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

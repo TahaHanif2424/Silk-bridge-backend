@@ -6,6 +6,8 @@ const authRoutes = require('./routes/authRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const packageRoutes = require('./routes/packageRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
+const tierRoutes = require('./routes/tierRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
 
 const app = express();
 
@@ -20,6 +22,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/tiers', tierRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Caspian Connect Backend is running.' });

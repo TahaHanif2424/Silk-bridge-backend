@@ -38,3 +38,24 @@ exports.getApplications = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.updateApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, tierId } = req.body;
+    
+    // Only update provided fields
+    const data = {};
+    if (status) data.status = status;
+    if (tierId) data.tierId = tierId;
+
+    const application = await prisma.application.update({
+      where: { id },
+      data
+    });
+    
+    res.status(200).json(application);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
