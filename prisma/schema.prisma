@@ -9,7 +9,7 @@ datasource db {
 
 model User {
   id        String   @id @default(uuid())
-  name      String
+  name      String?
   email     String   @unique
   password  String
   role      String   @default("AGENCY") // ADMIN or AGENCY
@@ -32,4 +32,17 @@ model Package {
   itinerary   String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Application {
+  id           String   @id @default(uuid())
+  userId       String?  @unique
+  company      String
+  license      String?
+  email        String
+  website      String?
+  instagram    String?
+  status       String   @default("pending")
+  tierId       String   @default("silver")
+  submitted    DateTime @default(now())
 }

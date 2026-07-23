@@ -9,8 +9,8 @@ const generateToken = (id, role) => {
 
 exports.register = async (req, res) => {
   const { name, email, password, role } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: 'Please provide all fields' });
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Please provide email and password' });
   }
 
   try {
