@@ -35,8 +35,8 @@ exports.register = async (req, res) => {
 
     res.cookie('access_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
 
@@ -45,6 +45,7 @@ exports.register = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      token,
       tierId: 'silver' // newly registered user starts at silver
     });
   } catch (error) {
@@ -64,8 +65,8 @@ exports.login = async (req, res) => {
 
       res.cookie('access_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: true,
+        sameSite: 'none',
         maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
       });
 
@@ -85,6 +86,7 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        token,
         tierId
       });
     } else {
