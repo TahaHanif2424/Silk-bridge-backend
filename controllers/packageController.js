@@ -39,9 +39,6 @@ exports.createPackage = async (req, res) => {
     if (cleanData.duration !== undefined && cleanData.duration !== null) {
       cleanData.duration = parseInt(cleanData.duration, 10);
     }
-    if (cleanData.inventory !== undefined && cleanData.inventory !== null) {
-      cleanData.inventory = parseInt(cleanData.inventory, 10);
-    }
     if (cleanData.netPrice !== undefined && cleanData.netPrice !== null) {
       cleanData.netPrice = parseFloat(cleanData.netPrice);
     }
@@ -64,9 +61,6 @@ exports.updatePackage = async (req, res) => {
 
     if (cleanData.duration !== undefined && cleanData.duration !== null) {
       cleanData.duration = parseInt(cleanData.duration, 10);
-    }
-    if (cleanData.inventory !== undefined && cleanData.inventory !== null) {
-      cleanData.inventory = parseInt(cleanData.inventory, 10);
     }
     if (cleanData.netPrice !== undefined && cleanData.netPrice !== null) {
       cleanData.netPrice = parseFloat(cleanData.netPrice);

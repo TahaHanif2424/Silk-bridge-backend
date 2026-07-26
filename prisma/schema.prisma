@@ -26,7 +26,6 @@ model Package {
   difficulty  String?
   netPrice    Float    // Our cost
   retailPrice Float    // Selling price for agencies
-  inventory   Int?
   active      Boolean  @default(true)
   image       String?
   itinerary   String[]
