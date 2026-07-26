@@ -35,3 +35,19 @@ exports.createBooking = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.updateBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const booking = await prisma.booking.update({
+      where: { id },
+      data: { status }
+    });
+
+    res.status(200).json(booking);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
