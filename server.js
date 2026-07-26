@@ -26,7 +26,7 @@ app.use('/api/tiers', tierRoutes);
 app.use('/api/bookings', bookingRoutes);
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Caspian Connect Backend is running.' });
+  res.json({ status: 'ok', message: 'Silkbridge B2B Backend is running.' });
 });
 
 const PORT = process.env.PORT || 5000;
