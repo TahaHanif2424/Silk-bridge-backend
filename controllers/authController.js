@@ -44,7 +44,8 @@ exports.register = async (req, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      tierId: 'silver' // newly registered user starts at silver
     });
   } catch (error) {
     console.error(error);
@@ -68,11 +69,23 @@ exports.login = async (req, res) => {
         maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
       });
 
+      // Get user's tierId from application if exists
+      let tierId = 'silver';
+      if (user.role === 'AGENCY') {
+        const app = await prisma.application.findUnique({
+          where: { userId: user.id }
+        });
+        if (app) {
+          tierId = app.tierId;
+        }
+      }
+
       res.json({
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        tierId
       });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
@@ -94,8 +107,26 @@ exports.getMe = async (req, res) => {
       where: { id: req.user.id },
       select: { id: true, name: true, email: true, role: true }
     });
-    res.status(200).json(user);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    let tierId = 'silver';
+    if (user.role === 'AGENCY') {
+      const app = await prisma.application.findUnique({
+        where: { userId: user.id }
+      });
+      if (app) {
+        tierId = app.tierId;
+      }
+    }
+
+    res.status(200).json({
+      ...user,
+      tierId
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

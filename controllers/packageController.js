@@ -34,8 +34,23 @@ exports.getPackageById = async (req, res) => {
 
 exports.createPackage = async (req, res) => {
   try {
+    const { id, baseNetCost, ...cleanData } = req.body;
+    
+    if (cleanData.duration !== undefined && cleanData.duration !== null) {
+      cleanData.duration = parseInt(cleanData.duration, 10);
+    }
+    if (cleanData.inventory !== undefined && cleanData.inventory !== null) {
+      cleanData.inventory = parseInt(cleanData.inventory, 10);
+    }
+    if (cleanData.netPrice !== undefined && cleanData.netPrice !== null) {
+      cleanData.netPrice = parseFloat(cleanData.netPrice);
+    }
+    if (cleanData.retailPrice !== undefined && cleanData.retailPrice !== null) {
+      cleanData.retailPrice = parseFloat(cleanData.retailPrice);
+    }
+
     const newPkg = await prisma.package.create({
-      data: req.body
+      data: cleanData
     });
     res.status(201).json(newPkg);
   } catch (error) {
@@ -45,13 +60,28 @@ exports.createPackage = async (req, res) => {
 
 exports.updatePackage = async (req, res) => {
   try {
+    const { id, baseNetCost, ...cleanData } = req.body;
+
+    if (cleanData.duration !== undefined && cleanData.duration !== null) {
+      cleanData.duration = parseInt(cleanData.duration, 10);
+    }
+    if (cleanData.inventory !== undefined && cleanData.inventory !== null) {
+      cleanData.inventory = parseInt(cleanData.inventory, 10);
+    }
+    if (cleanData.netPrice !== undefined && cleanData.netPrice !== null) {
+      cleanData.netPrice = parseFloat(cleanData.netPrice);
+    }
+    if (cleanData.retailPrice !== undefined && cleanData.retailPrice !== null) {
+      cleanData.retailPrice = parseFloat(cleanData.retailPrice);
+    }
+
     const updatedPkg = await prisma.package.update({
       where: { id: req.params.id },
-      data: req.body
+      data: cleanData
     });
     res.status(200).json(updatedPkg);
   } catch (error) {
-    res.status(404).json({ message: 'Package not found or update failed' });
+    res.status(404).json({ message: 'Package not found or update failed', error: error.message });
   }
 };
 
