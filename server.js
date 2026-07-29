@@ -76,7 +76,77 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Server error' });
 });
 
+async function runMigrations() {
+  console.log("Checking and running automatic database schema migrations...");
+  const prismaInstance = require('./lib/prisma');
+  
+  const sqlStatements = [
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "segment" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "code" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "validity" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "hotelCategory" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "groupNetPrice" DOUBLE PRECISION;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "minPax" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "route" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "shortProgram" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "includes" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "excludes" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "eventIncluded" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "ticketIncluded" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "notes" TEXT;',
+    'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "sourceUrl" TEXT;',
+    'ALTER TABLE "Package" DROP COLUMN IF EXISTS "itinerary";',
+    'ALTER TABLE "Package" DROP COLUMN IF EXISTS "durationExcel";',
+    'ALTER TABLE "Package" DROP COLUMN IF EXISTS "groupRetailPrice";',
+    'ALTER TABLE "Package" ALTER COLUMN "duration" TYPE TEXT;'
+  ];
+
+  for (const sql of sqlStatements) {
+    try {
+      await prismaInstance.$executeRawUnsafe(sql);
+    } catch (err) {
+      console.error(`Automatic migration step failed (${sql}):`, err.message);
+      if (sql.includes('ALTER COLUMN "duration"')) {
+        try {
+          await prismaInstance.$executeRawUnsafe('ALTER TABLE "Package" DROP COLUMN IF EXISTS "duration";');
+          await prismaInstance.$executeRawUnsafe('ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "duration" TEXT;');
+        } catch (e) {
+          console.error("Failed to drop and recreate duration column:", e.message);
+        }
+      }
+    }
+  }
+  console.log("Automatic database migrations completed.");
+
+  // Automatic Seeding if Package table is empty
+  try {
+    const pkgCount = await prismaInstance.package.count();
+    if (pkgCount === 0) {
+      console.log("Package table is empty. Running automatic seed...");
+      const fs = require('fs');
+      const path = require('path');
+      const seedDataPath = path.join(__dirname, 'prisma', 'seed_data.json');
+      if (fs.existsSync(seedDataPath)) {
+        const rawData = fs.readFileSync(seedDataPath, 'utf8');
+        const packages = JSON.parse(rawData);
+        for (const pkg of packages) {
+          await prismaInstance.package.create({ data: pkg });
+        }
+        console.log(`Successfully seeded ${packages.length} packages automatically.`);
+      } else {
+        console.log("Seed data file not found at startup, skipping auto-seed.");
+      }
+    }
+  } catch (e) {
+    console.error("Auto-seeding check failed:", e.message);
+  }
+}
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+runMigrations()
+  .catch(err => console.error("Database migrations error on startup:", err))
+  .finally(() => {
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  });
