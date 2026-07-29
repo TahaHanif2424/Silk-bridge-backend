@@ -1,10 +1,28 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
+const { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE, authCookieOptions } = require('../lib/authCookie');
 
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
+
+// A database that cannot be reached is not the caller's fault, and reporting it
+// as a flat 500 "Server error" makes a working login look like bad credentials.
+const failWithCause = (res, error, context) => {
+  console.error(`${context}:`, error);
+
+  if (error.name === 'PrismaClientInitializationError' || error.code === 'P1001') {
+    return res.status(503).json({
+      message: 'Cannot reach the database. Check DATABASE_URL and network access.',
+      code: 'DB_UNREACHABLE',
+    });
+  }
+
+  return res.status(500).json({
+    message: 'Server error',
+    ...(process.env.NODE_ENV === 'production' ? {} : { error: error.message }),
+  });
 };
 
 exports.register = async (req, res) => {
@@ -33,12 +51,7 @@ exports.register = async (req, res) => {
 
     const token = generateToken(user.id, user.role);
 
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-    });
+    res.cookie(AUTH_COOKIE_NAME, token, { ...authCookieOptions, maxAge: AUTH_COOKIE_MAX_AGE });
 
     res.status(201).json({
       id: user.id,
@@ -49,26 +62,24 @@ exports.register = async (req, res) => {
       tierId: 'silver' // newly registered user starts at silver
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    failWithCause(res, error, 'Register error');
   }
 };
 
 exports.login = async (req, res) => {
   const { email, password } = req.body;
-  
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Please provide email and password' });
+  }
+
   try {
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (user && (await bcrypt.compare(password, user.password))) {
       const token = generateToken(user.id, user.role);
 
-      res.cookie('access_token', token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-      });
+      res.cookie(AUTH_COOKIE_NAME, token, { ...authCookieOptions, maxAge: AUTH_COOKIE_MAX_AGE });
 
       // Get user's tierId from application if exists
       let tierId = 'silver';
@@ -93,13 +104,13 @@ exports.login = async (req, res) => {
       res.status(401).json({ message: 'Invalid credentials' });
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    failWithCause(res, error, 'Login error');
   }
 };
 
 exports.logout = (req, res) => {
-  res.clearCookie('access_token');
+  // Attributes must match the ones used to set it, or the browser keeps the cookie.
+  res.clearCookie(AUTH_COOKIE_NAME, authCookieOptions);
   res.json({ message: 'Logged out successfully' });
 };
 
@@ -129,6 +140,6 @@ exports.getMe = async (req, res) => {
       tierId
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    failWithCause(res, error, 'getMe error');
   }
 };

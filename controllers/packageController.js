@@ -1,5 +1,11 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
+
+// Net cost is B2B-only data, so guests get the retail price and nothing else.
+const forViewer = (pkg, user) => {
+  if (user) return pkg;
+  const { netPrice, ...rest } = pkg;
+  return { ...rest, netPrice: null };
+};
 
 exports.getPackages = async (req, res) => {
   try {
@@ -7,11 +13,10 @@ exports.getPackages = async (req, res) => {
       where: { active: true },
       orderBy: { createdAt: 'desc' }
     });
-    
-    // The frontend will receive netPrice and retailPrice
-    // Margin is simply retailPrice - netPrice
-    res.status(200).json(packages);
+
+    res.status(200).json(packages.map(pkg => forViewer(pkg, req.user)));
   } catch (error) {
+    console.error('getPackages error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -21,13 +26,14 @@ exports.getPackageById = async (req, res) => {
     const pkg = await prisma.package.findUnique({
       where: { id: req.params.id }
     });
-    
+
     if (pkg) {
-      res.status(200).json(pkg);
+      res.status(200).json(forViewer(pkg, req.user));
     } else {
       res.status(404).json({ message: 'Package not found' });
     }
   } catch (error) {
+    console.error('getPackageById error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
