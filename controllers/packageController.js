@@ -17,7 +17,7 @@ exports.getPackages = async (req, res) => {
     res.status(200).json(packages.map(pkg => forViewer(pkg, req.user)));
   } catch (error) {
     console.error('getPackages error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', error: error.message, stack: error.stack });
   }
 };
 
