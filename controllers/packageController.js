@@ -3,8 +3,8 @@ const prisma = require('../lib/prisma');
 // Net cost is B2B-only data, so guests get the retail price and nothing else.
 const forViewer = (pkg, user) => {
   if (user) return pkg;
-  const { netPrice, ...rest } = pkg;
-  return { ...rest, netPrice: null };
+  const { netPrice, groupNetPrice, ...rest } = pkg;
+  return { ...rest, netPrice: null, groupNetPrice: null };
 };
 
 exports.getPackages = async (req, res) => {
@@ -42,9 +42,6 @@ exports.createPackage = async (req, res) => {
   try {
     const { id, baseNetCost, ...cleanData } = req.body;
     
-    if (cleanData.duration !== undefined && cleanData.duration !== null) {
-      cleanData.duration = parseInt(cleanData.duration, 10);
-    }
     if (cleanData.netPrice !== undefined && cleanData.netPrice !== null) {
       cleanData.netPrice = parseFloat(cleanData.netPrice);
     }
@@ -65,9 +62,6 @@ exports.updatePackage = async (req, res) => {
   try {
     const { id, baseNetCost, ...cleanData } = req.body;
 
-    if (cleanData.duration !== undefined && cleanData.duration !== null) {
-      cleanData.duration = parseInt(cleanData.duration, 10);
-    }
     if (cleanData.netPrice !== undefined && cleanData.netPrice !== null) {
       cleanData.netPrice = parseFloat(cleanData.netPrice);
     }

@@ -19,18 +19,33 @@ model User {
 
 model Package {
   id          String   @id @default(uuid())
-  title       String
+  title       String   // Maps to Package Name
   subtitle    String?
   region      String?
-  duration    Int?
+  duration    String?  // Maps to Duration (e.g. "4D/3N")
   difficulty  String?
-  netPrice    Float    // Our cost
-  retailPrice Float    // Selling price for agencies
+  netPrice    Float    // Maps to FIT Price PP USD
+  retailPrice Float    // Calculated FIT Retail price (Net * 1.66)
   active      Boolean  @default(true)
   image       String?
-  itinerary   String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Excel columns (Single Occurrence)
+  segment        String?  // Segment
+  code           String?  // Package Code (e.g. "FAM-AZ-04")
+  validity       String?  // Validity (e.g. "02 Jun–30 Sep 2026")
+  hotelCategory  String?  // Hotel Category (e.g. "3*")
+  groupNetPrice  Float?   // Group Price PP USD
+  minPax         String?  // Min Pax (e.g. "FIT: 2 pax / Group: 15+ pax")
+  route          String?  // Route
+  shortProgram   String?  // Maps to Short Program (raw text description)
+  includes       String?  // Includes
+  excludes       String?  // Excludes
+  eventIncluded  String?  // Event Included
+  ticketIncluded String?  // Ticket Included
+  notes          String?  // Notes
+  sourceUrl      String?  // Source / URL
 }
 
 model Application {
