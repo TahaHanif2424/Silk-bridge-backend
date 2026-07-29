@@ -27,19 +27,17 @@ const app = express();
 // credentials: true lets any website issue authenticated requests on a user's
 // behalf. Allow localhost in dev (the Vite port is not fixed) and require an
 // explicit allowlist everywhere else.
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-const isLocalhost = (origin) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+const allowedOrigins = [
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+  'https://caspian-connect-portal.vercel.app'
+];
 
 app.use(cors({
   origin: (origin, callback) => {
     // Same-origin/non-browser callers (curl, health checks) send no Origin.
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    if (process.env.NODE_ENV !== 'production' && isLocalhost(origin)) return callback(null, true);
     return callback(new Error(`Origin ${origin} is not allowed by CORS`));
   },
   credentials: true
