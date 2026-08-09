@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { sendAdminNotificationEmail } = require('../lib/mail');
 
 exports.createApplication = async (req, res) => {
   try {
@@ -19,6 +20,13 @@ exports.createApplication = async (req, res) => {
         instagram
       }
     });
+
+    // Send actual email notification to admin via configured SMTP (fails gracefully if not configured)
+    try {
+      await sendAdminNotificationEmail(application);
+    } catch (mailErr) {
+      console.error('[SMTP WARNING] Admin notification email failed:', mailErr);
+    }
 
     res.status(201).json(application);
   } catch (error) {

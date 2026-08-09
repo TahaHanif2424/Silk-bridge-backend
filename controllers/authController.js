@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const prisma = require('../lib/prisma');
 const { AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE, authCookieOptions } = require('../lib/authCookie');
+const { sendOtpEmail, sendRegistrationOtpEmail } = require('../lib/mail');
 
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -141,5 +142,92 @@ exports.getMe = async (req, res) => {
     });
   } catch (error) {
     failWithCause(res, error, 'getMe error');
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: 'Please provide email' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: 'User with this email does not exist' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        resetOtp: otp,
+        resetOtpExpires: expires
+      }
+    });
+
+    console.log(`[PASSWORD RESET OTP] For user ${email}: ${otp}`);
+
+    // Send actual email via configured SMTP (fails gracefully to console if not configured)
+    await sendOtpEmail(email, otp);
+
+    const responsePayload = { message: 'OTP sent successfully to your email.' };
+    res.status(200).json(responsePayload);
+  } catch (error) {
+    failWithCause(res, error, 'Forgot password error');
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { email, otp, password } = req.body;
+  if (!email || !otp || !password) {
+    return res.status(400).json({ message: 'Please provide email, otp, and new password' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!user.resetOtp || user.resetOtp !== otp || !user.resetOtpExpires || new Date() > user.resetOtpExpires) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        password: hashedPassword,
+        resetOtp: null,
+        resetOtpExpires: null
+      }
+    });
+
+    res.status(200).json({ message: 'Password has been reset successfully' });
+  } catch (error) {
+    failWithCause(res, error, 'Reset password error');
+  }
+};
+
+exports.sendRegistrationOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    return res.status(400).json({ message: 'Please provide email and otp' });
+  }
+
+  try {
+    console.log(`[REGISTRATION OTP] For user ${email}: ${otp}`);
+
+    // Send actual email via configured SMTP (fails gracefully to console if not configured)
+    await sendRegistrationOtpEmail(email, otp);
+
+    res.status(200).json({ message: 'OTP sent successfully to your email.' });
+  } catch (error) {
+    failWithCause(res, error, 'Send registration OTP error');
   }
 };
