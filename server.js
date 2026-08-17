@@ -1,9 +1,6 @@
 require('dotenv').config();
 
-// Validated before the route modules load, so a missing value is reported as
-// itself rather than as whatever the first dependent module happens to throw.
-// Without a secret, jwt.sign throws on login and jwt.verify rejects every
-// request, which looks like "auth is broken" instead of "config is missing".
+// Ensure critical environment variables are present before starting
 for (const key of ['JWT_SECRET', 'DATABASE_URL']) {
   if (!process.env[key]) {
     console.error(`FATAL: ${key} is not set. Copy .env.example to .env and fill it in.`);
@@ -14,6 +11,8 @@ for (const key of ['JWT_SECRET', 'DATABASE_URL']) {
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const prisma = require('./lib/prisma');
+
 const authRoutes = require('./routes/authRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const packageRoutes = require('./routes/packageRoutes');
@@ -23,28 +22,45 @@ const bookingRoutes = require('./routes/bookingRoutes');
 
 const app = express();
 
-// `origin: true` reflects whatever Origin is sent, which combined with
-// credentials: true lets any website issue authenticated requests on a user's
-// behalf. Allow localhost in dev (the Vite port is not fixed) and require an
-// explicit allowlist everywhere else.
-const allowedOrigins = [
+// Parse allowed CORS origins from environment and defaults
+const envOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const defaultOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:8080',
-  'https://caspian-connect-portal.vercel.app'
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://caspian-connect-portal.vercel.app',
+  'https://silkbridge.pk',
+  'https://www.silkbridge.pk'
 ];
+
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Same-origin/non-browser callers (curl, health checks) send no Origin.
+    // Non-browser or same-origin requests (curl, server-to-server, health checks) send no Origin
     if (!origin) return callback(null, true);
+
     if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // In non-production environments, permit any localhost/127.0.0.1 port
+    if (process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
     return callback(new Error(`Origin ${origin} is not allowed by CORS`));
   },
   credentials: true
 }));
-app.use(express.json());
-app.use(cookieParser()); 
 
+app.use(express.json());
+app.use(cookieParser());
+
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/packages', packageRoutes);
@@ -52,17 +68,22 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/tiers', tierRoutes);
 app.use('/api/bookings', bookingRoutes);
 
+// Health Check Endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Silkbridge B2B Backend is running.' });
+  res.json({
+    status: 'ok',
+    service: 'Silkbridge Caspian Connect API',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
 });
 
+// Central Error Handler
 app.use((err, req, res, next) => {
   if (err && /not allowed by CORS/.test(err.message)) {
     return res.status(403).json({ message: err.message, code: 'CORS_REJECTED' });
   }
 
-  // Malformed JSON bodies and similar already carry a meaningful status;
-  // reporting them as 500 hides the fact that the request itself was bad.
   if (err && err.type === 'entity.parse.failed') {
     return res.status(400).json({ message: 'Invalid JSON body', code: 'BAD_JSON' });
   }
@@ -72,14 +93,14 @@ app.use((err, req, res, next) => {
     return res.status(status).json({ message: err.message });
   }
 
-  console.error('Unhandled error:', err);
-  res.status(500).json({ message: 'Server error' });
+  console.error('Unhandled server error:', err);
+  res.status(500).json({
+    message: 'Server error',
+    ...(process.env.NODE_ENV !== 'production' ? { error: err.message } : {})
+  });
 });
 
-async function runMigrations() {
-  console.log("Checking and running automatic database schema migrations...");
-  const prismaInstance = require('./lib/prisma');
-  
+async function initializeDatabase() {
   const sqlStatements = [
     'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "segment" TEXT;',
     'ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "code" TEXT;',
@@ -103,26 +124,23 @@ async function runMigrations() {
 
   for (const sql of sqlStatements) {
     try {
-      await prismaInstance.$executeRawUnsafe(sql);
+      await prisma.$executeRawUnsafe(sql);
     } catch (err) {
-      console.error(`Automatic migration step failed (${sql}):`, err.message);
       if (sql.includes('ALTER COLUMN "duration"')) {
         try {
-          await prismaInstance.$executeRawUnsafe('ALTER TABLE "Package" DROP COLUMN IF EXISTS "duration";');
-          await prismaInstance.$executeRawUnsafe('ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "duration" TEXT;');
+          await prisma.$executeRawUnsafe('ALTER TABLE "Package" DROP COLUMN IF EXISTS "duration";');
+          await prisma.$executeRawUnsafe('ALTER TABLE "Package" ADD COLUMN IF NOT EXISTS "duration" TEXT;');
         } catch (e) {
-          console.error("Failed to drop and recreate duration column:", e.message);
+          // ignore
         }
       }
     }
   }
-  console.log("Automatic database migrations completed.");
 
-  // Automatic Seeding if Package table is empty
+  // Automatic initial seeding if Package table is empty
   try {
-    const pkgCount = await prismaInstance.package.count();
+    const pkgCount = await prisma.package.count();
     if (pkgCount === 0) {
-      console.log("Package table is empty. Running automatic seed...");
       const fs = require('fs');
       const path = require('path');
       const seedDataPath = path.join(__dirname, 'prisma', 'seed_data.json');
@@ -130,23 +148,36 @@ async function runMigrations() {
         const rawData = fs.readFileSync(seedDataPath, 'utf8');
         const packages = JSON.parse(rawData);
         for (const pkg of packages) {
-          await prismaInstance.package.create({ data: pkg });
+          await prisma.package.create({ data: pkg });
         }
-        console.log(`Successfully seeded ${packages.length} packages automatically.`);
-      } else {
-        console.log("Seed data file not found at startup, skipping auto-seed.");
       }
     }
   } catch (e) {
-    console.error("Auto-seeding check failed:", e.message);
+    console.error('Auto-seed check failed:', e.message);
   }
 }
 
 const PORT = process.env.PORT || 5000;
-runMigrations()
-  .catch(err => console.error("Database migrations error on startup:", err))
+
+initializeDatabase()
+  .catch(err => console.error('Database initialization warning:', err.message))
   .finally(() => {
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+    const server = app.listen(PORT, () => {
+      console.log(`Caspian Connect API is running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
     });
+
+    const shutdown = async (signal) => {
+      console.log(`Received ${signal}. Shutting down gracefully...`);
+      server.close(async () => {
+        try {
+          await prisma.$disconnect();
+        } catch (e) {
+          // ignore
+        }
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   });

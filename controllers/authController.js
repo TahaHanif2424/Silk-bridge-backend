@@ -168,9 +168,7 @@ exports.forgotPassword = async (req, res) => {
       }
     });
 
-    console.log(`[PASSWORD RESET OTP] For user ${email}: ${otp}`);
-
-    // Send actual email via configured SMTP (fails gracefully to console if not configured)
+    // Send actual email via configured SMTP (fails gracefully if not configured)
     await sendOtpEmail(email, otp);
 
     const responsePayload = { message: 'OTP sent successfully to your email.' };
@@ -221,9 +219,7 @@ exports.sendRegistrationOtp = async (req, res) => {
   }
 
   try {
-    console.log(`[REGISTRATION OTP] For user ${email}: ${otp}`);
-
-    // Send actual email via configured SMTP (fails gracefully to console if not configured)
+    // Send actual email via configured SMTP (fails gracefully if not configured)
     await sendRegistrationOtpEmail(email, otp);
 
     res.status(200).json({ message: 'OTP sent successfully to your email.' });

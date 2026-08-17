@@ -1,22 +1,31 @@
-# Caspian Connect Backend Architecture
+# Caspian Connect (Silkbridge) Backend Architecture
 
 ## Overview
-This is an Express.js backend for the Caspian Connect Portal. It provides RESTful APIs for user authentication and other services.
+Express.js REST API backend powering the Caspian Connect B2B Portal (Silkbridge). It handles user authentication, partner applications, travel package catalog management, partnership tier discounts, and booking administration.
 
 ## Tech Stack
-- **Node.js & Express.js**: Web framework
-- **MongoDB & Mongoose**: Database & ODM (Prepared)
-- **JWT**: JSON Web Tokens for secure authentication
-- **Bcrypt**: Password hashing
+- **Node.js & Express.js**: Application framework and API routing
+- **PostgreSQL & Prisma ORM**: Relational database with Neon Serverless adapter (WebSocket / HTTP over 443)
+- **JWT (JSON Web Tokens) & HTTP-Only Cookies**: Dual-support secure token authentication
+- **Bcrypt**: Salted password hashing
+- **Nodemailer**: Transactional email service for partner notifications and password resets
 
 ## Directory Structure
-- `server.js`: Application entry point. Sets up middleware and routes.
-- `routes/`: Defines API endpoints.
-- `controllers/`: Contains business logic for routes.
-- `middleware/`: Custom middleware (e.g., JWT verification).
-- `models/`: Mongoose schemas for MongoDB.
+- `server.js`: Main server entry point, CORS configuration, centralized error handling, and graceful shutdown.
+- `lib/`:
+  - `prisma.js`: Prisma client initialization with automated Neon serverless driver fallback.
+  - `mail.js`: Nodemailer service for transactional emails and admin alerts.
+  - `authCookie.js`: Secure cookie helper with cross-origin and production support.
+- `middleware/`:
+  - `auth.js`: JWT protection, optional authentication, and role-based access control (`adminOnly`).
+- `controllers/`: Business logic implementations for Auth, Packages, Applications, Tiers, Bookings.
+- `routes/`: Express route definitions.
+- `prisma/`: Prisma schema, migrations, seed datasets (`seed_data.json`), and seed scripts.
 
-## Authentication Flow
-1. **Register**: `POST /api/auth/register` - Creates a new user, hashes password, and returns a JWT.
-2. **Login**: `POST /api/auth/login` - Verifies credentials and returns a JWT.
-3. **Protected Routes**: Middleware verifies the `Bearer` token before granting access (e.g., `GET /api/auth/me`).
+## API Endpoints Summary
+- **Authentication**: `/api/auth` (`/login`, `/register`, `/logout`, `/me`, `/forgot-password`, `/reset-password`, `/send-registration-otp`)
+- **Packages**: `/api/packages` (Public overview, authenticated B2B net pricing, admin CRUD)
+- **Applications**: `/api/applications` (Partner registration submission, admin approvals, tier upgrades, custom email dispatcher)
+- **Tiers**: `/api/tiers` (B2B discount tiers: Silver, Gold, Platinum)
+- **Bookings**: `/api/bookings` (Booking creation, listing, and status management)
+- **Health Check**: `GET /health`
