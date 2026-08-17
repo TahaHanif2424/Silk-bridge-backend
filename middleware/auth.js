@@ -55,7 +55,8 @@ exports.optionalProtect = async (req, res, next) => {
 };
 
 exports.adminOnly = (req, res, next) => {
-  if (req.user && req.user.role === 'ADMIN') {
+  const role = req.user?.role ? String(req.user.role).toUpperCase() : '';
+  if (role === 'ADMIN' || role === 'SUPERADMIN') {
     next();
   } else {
     res.status(403).json({ message: 'Not authorized as an admin' });
