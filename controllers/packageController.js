@@ -36,7 +36,6 @@ const forViewer = (pkg, user) => {
 exports.getPackages = async (req, res) => {
   try {
     const packages = await prisma.package.findMany({
-      where: { active: true },
       orderBy: { createdAt: 'desc' }
     });
 
