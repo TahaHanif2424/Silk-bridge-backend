@@ -1,5 +1,5 @@
 const prisma = require('../lib/prisma');
-const { sendAdminNotificationEmail } = require('../lib/mail');
+const { sendAdminNotificationEmail, sendEmailGracefully } = require('../lib/mail');
 
 exports.createApplication = async (req, res) => {
   try {
@@ -66,3 +66,32 @@ exports.updateApplication = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.sendCustomEmail = async (req, res) => {
+  try {
+    const { to, subject, html, text } = req.body;
+    if (!to || !to.trim()) {
+      return res.status(400).json({ message: 'Recipient email address is required' });
+    }
+    if (!subject || !subject.trim()) {
+      return res.status(400).json({ message: 'Email subject is required' });
+    }
+
+    const sent = await sendEmailGracefully({
+      to: to.trim(),
+      subject: subject.trim(),
+      html: html || undefined,
+      text: text || undefined,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: sent ? 'Email sent successfully via SMTP' : 'Email dispatched (SMTP unconfigured; logged to server console)',
+      recipient: to,
+    });
+  } catch (error) {
+    console.error('Error sending custom email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
+};
+
